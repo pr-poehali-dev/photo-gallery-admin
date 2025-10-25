@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+import ImagePicker from '@/components/ImagePicker';
 
 interface GalleryItem {
   id: number;
@@ -25,6 +26,7 @@ const Admin = () => {
     title: '',
     description: ''
   });
+  const [showImagePicker, setShowImagePicker] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -240,15 +242,38 @@ const Admin = () => {
             </h2>
             <form onSubmit={handleAddItem} className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">URL изображения</label>
-                <Input
-                  type="url"
-                  placeholder="https://example.com/image.jpg"
-                  value={newItem.image_url}
-                  onChange={(e) => setNewItem({ ...newItem, image_url: e.target.value })}
-                  className="bg-secondary border-border"
-                  required
-                />
+                <label className="text-sm font-medium mb-2 block">Изображение</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    placeholder="URL изображения или выберите из галереи"
+                    value={newItem.image_url}
+                    onChange={(e) => setNewItem({ ...newItem, image_url: e.target.value })}
+                    className="bg-secondary border-border flex-1"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setShowImagePicker(true)}
+                    variant="outline"
+                    className="px-4"
+                  >
+                    <Icon name="Images" size={18} className="mr-2" />
+                    Галерея
+                  </Button>
+                </div>
+                {newItem.image_url && (
+                  <div className="mt-3 rounded-lg overflow-hidden border border-border">
+                    <img
+                      src={newItem.image_url}
+                      alt="Preview"
+                      className="w-full h-48 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://via.placeholder.com/400x300?text=Invalid+Image';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium mb-2 block">Название</label>
@@ -360,6 +385,12 @@ const Admin = () => {
           )}
         </Card>
       </main>
+
+      <ImagePicker
+        isOpen={showImagePicker}
+        onClose={() => setShowImagePicker(false)}
+        onSelect={(url) => setNewItem({ ...newItem, image_url: url })}
+      />
     </div>
   );
 };
