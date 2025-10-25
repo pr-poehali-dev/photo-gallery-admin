@@ -38,6 +38,7 @@ const Admin = () => {
     telegram_username: ''
   });
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -302,7 +303,7 @@ const Admin = () => {
                 <div className="flex gap-2">
                   <Input
                     type="url"
-                    placeholder="URL фото или выберите из галереи"
+                    placeholder="URL фото или загрузите с устройства"
                     value={newPerson.image_url}
                     onChange={(e) => setNewPerson({ ...newPerson, image_url: e.target.value })}
                     className="bg-secondary border-border flex-1"
@@ -313,10 +314,88 @@ const Admin = () => {
                     onClick={() => setShowImagePicker(true)}
                     variant="outline"
                     className="px-4"
+                    disabled={uploading}
                   >
                     <Icon name="Images" size={18} />
                   </Button>
+                  <Button
+                    type="button"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    variant="outline"
+                    className="px-4"
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Icon name="Upload" size={18} />
+                    )}
+                  </Button>
                 </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    if (!file.type.startsWith('image/')) {
+                      toast({
+                        title: 'Ошибка',
+                        description: 'Пожалуйста, выберите изображение',
+                        variant: 'destructive'
+                      });
+                      return;
+                    }
+
+                    if (file.size > 10 * 1024 * 1024) {
+                      toast({
+                        title: 'Ошибка',
+                        description: 'Файл слишком большой (макс. 10 МБ)',
+                        variant: 'destructive'
+                      });
+                      return;
+                    }
+
+                    setUploading(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append('image', file);
+
+                      const response = await fetch('https://functions.poehali.dev/d3edc9aa-f2d6-4fdc-9de0-d42e6bc13784', {
+                        method: 'POST',
+                        body: formData
+                      });
+
+                      const data = await response.json();
+
+                      if (data.url) {
+                        setNewPerson({ ...newPerson, image_url: data.url });
+                        toast({
+                          title: 'Успех!',
+                          description: 'Фото успешно загружено'
+                        });
+                      } else {
+                        toast({
+                          title: 'Ошибка',
+                          description: 'Не удалось загрузить фото',
+                          variant: 'destructive'
+                        });
+                      }
+                    } catch (error) {
+                      toast({
+                        title: 'Ошибка',
+                        description: 'Произошла ошибка при загрузке',
+                        variant: 'destructive'
+                      });
+                    } finally {
+                      setUploading(false);
+                      e.target.value = '';
+                    }
+                  }}
+                />
                 {newPerson.image_url && (
                   <div className="mt-3 rounded-lg overflow-hidden border border-border">
                     <img

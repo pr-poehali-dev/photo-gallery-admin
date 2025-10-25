@@ -17,6 +17,7 @@ interface Person {
   category_name?: string;
   category_color?: string;
   telegram_username?: string;
+  views?: number;
   created_at: string;
 }
 
@@ -144,7 +145,18 @@ const Gallery = () => {
                 key={person.id}
                 className="group cursor-pointer overflow-hidden border-border bg-card hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 animate-fade-in hover:-translate-y-2"
                 style={{ animationDelay: `${index * 50}ms` }}
-                onClick={() => setSelectedPerson(person)}
+                onClick={async () => {
+                  setSelectedPerson(person);
+                  try {
+                    const res = await fetch(`https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a?type=view&id=${person.id}`);
+                    const data = await res.json();
+                    if (data.views) {
+                      setPersons(prev => prev.map(p => p.id === person.id ? { ...p, views: data.views } : p));
+                    }
+                  } catch (error) {
+                    console.error('Failed to increment view:', error);
+                  }
+                }}
               >
                 <div className="relative aspect-[3/4] overflow-hidden">
                   <img
@@ -167,11 +179,19 @@ const Gallery = () => {
                     <h3 className="text-lg font-bold text-foreground mb-1 line-clamp-1">
                       {person.name}
                     </h3>
-                    {person.telegram_username && (
-                      <p className="text-xs text-primary font-medium mb-2">
-                        {person.telegram_username}
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      {person.telegram_username && (
+                        <p className="text-xs text-primary font-medium">
+                          {person.telegram_username}
+                        </p>
+                      )}
+                      {person.views !== undefined && person.views > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-foreground bg-background/90 px-2 py-1 rounded-full font-medium">
+                          <Icon name="Eye" size={12} />
+                          {person.views}
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       {person.bio}
                     </p>
@@ -229,13 +249,21 @@ const Gallery = () => {
                   <p className="text-muted-foreground leading-relaxed text-lg mt-6 mb-6">
                     {selectedPerson.bio}
                   </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 rounded-lg px-4 py-3 w-fit">
-                    <Icon name="Calendar" size={16} />
-                    Добавлено: {new Date(selectedPerson.created_at).toLocaleDateString('ru-RU', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 rounded-lg px-4 py-3">
+                      <Icon name="Calendar" size={16} />
+                      {new Date(selectedPerson.created_at).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    {selectedPerson.views !== undefined && selectedPerson.views > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 rounded-lg px-4 py-3">
+                        <Icon name="Eye" size={16} />
+                        {selectedPerson.views} просмотр{selectedPerson.views === 1 ? '' : selectedPerson.views < 5 ? 'а' : 'ов'}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button

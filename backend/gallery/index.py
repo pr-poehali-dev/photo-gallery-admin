@@ -25,7 +25,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token',
                 'Access-Control-Max-Age': '86400'
             },
@@ -41,6 +41,37 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         request_type = query_params.get('type', 'persons')
         
         if method == 'GET':
+            if request_type == 'view':
+                person_id = query_params.get('id')
+                if not person_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        'body': json.dumps({'error': 'Missing id parameter'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cursor.execute(
+                    f'UPDATE {SCHEMA}.gallery_items SET views = views + 1 WHERE id = %s RETURNING views',
+                    (person_id,)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({'views': result['views'] if result else 0}),
+                    'isBase64Encoded': False
+                }
             if request_type == 'categories':
                 cursor.execute(f'SELECT * FROM {SCHEMA}.categories ORDER BY id')
                 categories = cursor.fetchall()
