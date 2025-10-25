@@ -7,11 +7,19 @@ import { useToast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 import ImagePicker from '@/components/ImagePicker';
 
-interface GalleryItem {
+interface Category {
+  id: number;
+  name: string;
+  color: string;
+}
+
+interface Person {
   id: number;
   image_url: string;
-  title: string;
-  description: string;
+  name: string;
+  bio: string;
+  category_id: number;
+  telegram_username?: string;
   created_at: string;
 }
 
@@ -19,12 +27,15 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [persons, setPersons] = useState<Person[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [newItem, setNewItem] = useState({
+  const [newPerson, setNewPerson] = useState({
     image_url: '',
-    title: '',
-    description: ''
+    name: '',
+    bio: '',
+    category_id: 1,
+    telegram_username: ''
   });
   const [showImagePicker, setShowImagePicker] = useState(false);
   const { toast } = useToast();
@@ -33,9 +44,34 @@ const Admin = () => {
     const token = localStorage.getItem('admin_token');
     if (token) {
       setIsAuthenticated(true);
-      fetchGalleryItems();
+      fetchData();
     }
   }, []);
+
+  const fetchData = async () => {
+    await fetchCategories();
+    await fetchPersons();
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a?type=categories');
+      const data = await response.json();
+      setCategories(data.categories || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchPersons = async () => {
+    try {
+      const response = await fetch('https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a');
+      const data = await response.json();
+      setPersons(data.items || []);
+    } catch (error) {
+      console.error('Error fetching persons:', error);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +89,7 @@ const Admin = () => {
       if (data.success) {
         localStorage.setItem('admin_token', data.token);
         setIsAuthenticated(true);
-        fetchGalleryItems();
+        fetchData();
         toast({
           title: 'Добро пожаловать!',
           description: 'Вы успешно вошли в админ-панель'
@@ -76,17 +112,7 @@ const Admin = () => {
     }
   };
 
-  const fetchGalleryItems = async () => {
-    try {
-      const response = await fetch('https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a');
-      const data = await response.json();
-      setItems(data.items || []);
-    } catch (error) {
-      console.error('Error fetching gallery:', error);
-    }
-  };
-
-  const handleAddItem = async (e: React.FormEvent) => {
+  const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -94,23 +120,35 @@ const Admin = () => {
       const response = await fetch('https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem)
+        body: JSON.stringify(newPerson)
       });
 
       const data = await response.json();
 
       if (data.success) {
         toast({
-          title: 'Успешно!',
-          description: 'Новый элемент добавлен в галерею'
+          title: 'Успех!',
+          description: 'Личность успешно добавлена'
         });
-        setNewItem({ image_url: '', title: '', description: '' });
-        fetchGalleryItems();
+        setNewPerson({
+          image_url: '',
+          name: '',
+          bio: '',
+          category_id: 1,
+          telegram_username: ''
+        });
+        fetchPersons();
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось добавить личность',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       toast({
         title: 'Ошибка',
-        description: 'Не удалось добавить элемент',
+        description: 'Произошла ошибка при добавлении',
         variant: 'destructive'
       });
     } finally {
@@ -118,7 +156,9 @@ const Admin = () => {
     }
   };
 
-  const handleDeleteItem = async (id: number) => {
+  const handleDeletePerson = async (id: number) => {
+    if (!confirm('Вы уверены, что хотите удалить эту личность?')) return;
+
     try {
       const response = await fetch(`https://functions.poehali.dev/9030f112-3631-4e10-9524-bce45dd0ff5a?id=${id}`, {
         method: 'DELETE'
@@ -129,14 +169,14 @@ const Admin = () => {
       if (data.success) {
         toast({
           title: 'Удалено',
-          description: 'Элемент успешно удалён из галереи'
+          description: 'Личность успешно удалена'
         });
-        fetchGalleryItems();
+        fetchPersons();
       }
     } catch (error) {
       toast({
         title: 'Ошибка',
-        description: 'Не удалось удалить элемент',
+        description: 'Не удалось удалить личность',
         variant: 'destructive'
       });
     }
@@ -149,23 +189,32 @@ const Admin = () => {
     setPassword('');
   };
 
+  const getCategoryById = (id: number) => {
+    return categories.find(c => c.id === id);
+  };
+
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 border-border bg-card animate-scale-in">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 border-border bg-card/80 backdrop-blur-sm shadow-2xl">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Icon name="Lock" size={32} className="text-primary" />
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl mx-auto mb-4 flex items-center justify-center">
+              <Icon name="Shield" size={32} className="text-white" />
             </div>
-            <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-            <p className="text-muted-foreground">Войдите для доступа к админ-панели</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Админ-панель
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Управление личностями TG Fame
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
+              <label className="text-sm font-medium mb-2 block">Логин</label>
               <Input
                 type="text"
-                placeholder="Логин"
+                placeholder="Введите логин"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="bg-secondary border-border"
@@ -173,9 +222,10 @@ const Admin = () => {
               />
             </div>
             <div>
+              <label className="text-sm font-medium mb-2 block">Пароль</label>
               <Input
                 type="password"
-                placeholder="Пароль"
+                placeholder="Введите пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-secondary border-border"
@@ -210,10 +260,16 @@ const Admin = () => {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Admin Panel
-            </h1>
-            <div className="flex gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+                <Icon name="Users" size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">TG Fame Admin</h1>
+                <p className="text-sm text-muted-foreground">Управление личностями</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
               <a
                 href="/"
                 className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-all duration-300 hover:scale-105 flex items-center gap-2"
@@ -235,20 +291,20 @@ const Admin = () => {
 
       <main className="container mx-auto px-4 py-12">
         <div className="grid lg:grid-cols-2 gap-8 mb-12">
-          <Card className="p-6 border-border bg-card animate-fade-in">
+          <Card className="p-6 border-border bg-card">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <Icon name="Plus" size={24} className="text-primary" />
-              Добавить новый элемент
+              <Icon name="UserPlus" size={24} className="text-primary" />
+              Добавить личность
             </h2>
-            <form onSubmit={handleAddItem} className="space-y-4">
+            <form onSubmit={handleAddPerson} className="space-y-5">
               <div>
-                <label className="text-sm font-medium mb-2 block">Изображение</label>
+                <label className="text-sm font-medium mb-2 block">Фото</label>
                 <div className="flex gap-2">
                   <Input
                     type="url"
-                    placeholder="URL изображения или выберите из галереи"
-                    value={newItem.image_url}
-                    onChange={(e) => setNewItem({ ...newItem, image_url: e.target.value })}
+                    placeholder="URL фото или выберите из галереи"
+                    value={newPerson.image_url}
+                    onChange={(e) => setNewPerson({ ...newPerson, image_url: e.target.value })}
                     className="bg-secondary border-border flex-1"
                     required
                   />
@@ -258,14 +314,13 @@ const Admin = () => {
                     variant="outline"
                     className="px-4"
                   >
-                    <Icon name="Images" size={18} className="mr-2" />
-                    Галерея
+                    <Icon name="Images" size={18} />
                   </Button>
                 </div>
-                {newItem.image_url && (
+                {newPerson.image_url && (
                   <div className="mt-3 rounded-lg overflow-hidden border border-border">
                     <img
-                      src={newItem.image_url}
+                      src={newPerson.image_url}
                       alt="Preview"
                       className="w-full h-48 object-cover"
                       onError={(e) => {
@@ -275,112 +330,169 @@ const Admin = () => {
                   </div>
                 )}
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-2 block">Название</label>
+                <label className="text-sm font-medium mb-2 block">Имя</label>
                 <Input
                   type="text"
-                  placeholder="Введите название"
-                  value={newItem.title}
-                  onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                  placeholder="Введите имя личности"
+                  value={newPerson.name}
+                  onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })}
                   className="bg-secondary border-border"
                   required
                 />
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-2 block">Описание</label>
+                <label className="text-sm font-medium mb-2 block">Категория</label>
+                <select
+                  value={newPerson.category_id}
+                  onChange={(e) => setNewPerson({ ...newPerson, category_id: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {categories.map(cat => (
+                    <div
+                      key={cat.id}
+                      className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                      style={{ backgroundColor: cat.color }}
+                    >
+                      {cat.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Telegram Username</label>
+                <Input
+                  type="text"
+                  placeholder="@username (опционально)"
+                  value={newPerson.telegram_username}
+                  onChange={(e) => setNewPerson({ ...newPerson, telegram_username: e.target.value })}
+                  className="bg-secondary border-border"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Биография</label>
                 <Textarea
-                  placeholder="Введите описание"
-                  value={newItem.description}
-                  onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                  placeholder="Расскажите о личности..."
+                  value={newPerson.bio}
+                  onChange={(e) => setNewPerson({ ...newPerson, bio: e.target.value })}
                   className="bg-secondary border-border min-h-32"
                   required
                 />
               </div>
+
               <Button
                 type="submit"
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? 'Добавление...' : 'Добавить элемент'}
+                {loading ? 'Добавление...' : 'Добавить личность'}
               </Button>
             </form>
           </Card>
 
-          <Card className="p-6 border-border bg-card animate-fade-in" style={{ animationDelay: '100ms' }}>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+          <Card className="p-6 border-border bg-gradient-to-br from-primary/5 to-accent/5">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Icon name="Info" size={24} className="text-primary" />
-              Как использовать
+              Категории
             </h2>
-            <div className="space-y-4 text-muted-foreground">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-primary font-bold">1</span>
+            <div className="space-y-4">
+              {categories.map(cat => (
+                <div
+                  key={cat.id}
+                  className="p-4 rounded-lg bg-card border border-border flex items-center gap-3"
+                >
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                  <span className="font-medium">{cat.name}</span>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Добавьте изображение</h3>
-                  <p>Вставьте URL изображения в первое поле</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-primary font-bold">2</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Заполните информацию</h3>
-                  <p>Добавьте название и описание к элементу</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-primary font-bold">3</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Опубликуйте</h3>
-                  <p>Нажмите кнопку и элемент появится в галерее</p>
-                </div>
-              </div>
+              ))}
+            </div>
+            <div className="mt-8 p-4 bg-card rounded-lg border border-border">
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                <Icon name="Sparkles" size={18} className="text-primary" />
+                Как это работает?
+              </h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>• Выберите или добавьте фото личности</li>
+                <li>• Укажите имя и категорию</li>
+                <li>• Добавьте биографию и Telegram</li>
+                <li>• Личность появится на главной странице</li>
+              </ul>
             </div>
           </Card>
         </div>
 
-        <Card className="p-6 border-border bg-card animate-fade-in" style={{ animationDelay: '200ms' }}>
+        <Card className="p-6 border-border bg-card">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Icon name="Image" size={24} className="text-primary" />
-            Текущие элементы ({items.length})
+            <Icon name="Users" size={24} className="text-primary" />
+            Все личности ({persons.length})
           </h2>
-          {items.length === 0 ? (
+          {persons.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Icon name="ImageOff" size={48} className="mx-auto mb-4 opacity-50" />
-              <p>Пока нет элементов в галерее</p>
+              <Icon name="UserX" size={48} className="mx-auto mb-4 opacity-50" />
+              <p>Пока нет добавленных личностей</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="group relative border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-all duration-300"
-                >
-                  <div className="aspect-[3/4] relative">
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {persons.map((person) => {
+                const category = getCategoryById(person.category_id);
+                return (
+                  <div
+                    key={person.id}
+                    className="group relative border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all duration-300 bg-secondary/30"
+                  >
+                    <div className="aspect-[3/4] relative">
+                      <img
+                        src={person.image_url}
+                        alt={person.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-3 right-3">
+                        {category && (
+                          <div
+                            className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg"
+                            style={{ backgroundColor: category.color }}
+                          >
+                            {category.name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-bold text-lg mb-1">{person.name}</h3>
+                      {person.telegram_username && (
+                        <p className="text-sm text-primary mb-2">
+                          {person.telegram_username}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        {person.bio}
+                      </p>
+                      <button
+                        onClick={() => handleDeletePerson(person.id)}
+                        className="w-full px-3 py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm font-medium"
+                      >
+                        <Icon name="Trash2" size={16} />
+                        Удалить
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-4 bg-secondary/50">
-                    <h3 className="font-semibold mb-1 truncate">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{item.description}</p>
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="w-full px-3 py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-md transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Icon name="Trash2" size={16} />
-                      Удалить
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -389,7 +501,7 @@ const Admin = () => {
       <ImagePicker
         isOpen={showImagePicker}
         onClose={() => setShowImagePicker(false)}
-        onSelect={(url) => setNewItem({ ...newItem, image_url: url })}
+        onSelect={(url) => setNewPerson({ ...newPerson, image_url: url })}
       />
     </div>
   );

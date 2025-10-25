@@ -1,23 +1,27 @@
 {
   "tests": [
     {
-      "name": "Test get gallery items",
+      "name": "Test get persons",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": {
-        "items": []
-      },
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     },
     {
-      "name": "Test create gallery item",
+      "name": "Test get categories",
+      "method": "GET",
+      "path": "/?type=categories",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test create person",
       "method": "POST",
       "path": "/",
       "body": {
         "image_url": "https://example.com/test.jpg",
-        "title": "Test Item",
-        "description": "Test description"
+        "name": "Test Person",
+        "bio": "Test bio",
+        "category_id": 1,
+        "telegram_username": "@test"
       },
       "expectedStatus": 201,
       "expectedBody": {

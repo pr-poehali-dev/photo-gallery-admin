@@ -1,7 +1,7 @@
 '''
-Business: Gallery API for managing fame list items (CRUD operations)
+Business: TG Fame Gallery API for managing persons with categories (CRUD operations)
 Args: event with httpMethod, body, queryStringParameters; context with request_id
-Returns: HTTP response with gallery items or operation status
+Returns: HTTP response with persons, categories or operation status
 '''
 
 import json
@@ -9,6 +9,8 @@ import os
 from typing import Dict, Any, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+SCHEMA = 't_p61347388_photo_gallery_admin'
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -35,39 +37,74 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        query_params = event.get('queryStringParameters', {}) or {}
+        request_type = query_params.get('type', 'persons')
+        
         if method == 'GET':
-            cursor.execute('SELECT * FROM gallery_items ORDER BY created_at DESC')
-            items = cursor.fetchall()
-            
-            # Convert datetime to string for JSON serialization
-            for item in items:
-                if item.get('created_at'):
-                    item['created_at'] = item['created_at'].isoformat()
-                if item.get('updated_at'):
-                    item['updated_at'] = item['updated_at'].isoformat()
-            
-            cursor.close()
-            conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'items': items}),
-                'isBase64Encoded': False
-            }
+            if request_type == 'categories':
+                cursor.execute(f'SELECT * FROM {SCHEMA}.categories ORDER BY id')
+                categories = cursor.fetchall()
+                
+                for cat in categories:
+                    if cat.get('created_at'):
+                        cat['created_at'] = cat['created_at'].isoformat()
+                
+                cursor.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({'categories': categories}),
+                    'isBase64Encoded': False
+                }
+            else:
+                cursor.execute(f'''
+                    SELECT 
+                        gi.*,
+                        c.name as category_name,
+                        c.color as category_color
+                    FROM {SCHEMA}.gallery_items gi
+                    LEFT JOIN {SCHEMA}.categories c ON gi.category_id = c.id
+                    ORDER BY gi.created_at DESC
+                ''')
+                items = cursor.fetchall()
+                
+                for item in items:
+                    if item.get('created_at'):
+                        item['created_at'] = item['created_at'].isoformat()
+                    if item.get('updated_at'):
+                        item['updated_at'] = item['updated_at'].isoformat()
+                
+                cursor.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({'items': items}),
+                    'isBase64Encoded': False
+                }
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
             image_url = body_data.get('image_url', '')
-            title = body_data.get('title', '')
-            description = body_data.get('description', '')
+            name = body_data.get('name', '')
+            bio = body_data.get('bio', '')
+            category_id = body_data.get('category_id', 1)
+            telegram_username = body_data.get('telegram_username', '')
             
             cursor.execute(
-                "INSERT INTO gallery_items (image_url, title, description) VALUES (%s, %s, %s) RETURNING id",
-                (image_url, title, description)
+                f'''INSERT INTO {SCHEMA}.gallery_items 
+                (image_url, name, bio, category_id, telegram_username) 
+                VALUES (%s, %s, %s, %s, %s) RETURNING id''',
+                (image_url, name, bio, category_id, telegram_username if telegram_username else None)
             )
             new_id = cursor.fetchone()['id']
             conn.commit()
@@ -88,7 +125,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         
         elif method == 'DELETE':
-            query_params = event.get('queryStringParameters', {})
             item_id = query_params.get('id')
             
             if not item_id:
@@ -102,7 +138,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
             
-            cursor.execute('DELETE FROM gallery_items WHERE id = %s', (item_id,))
+            cursor.execute(f'DELETE FROM {SCHEMA}.gallery_items WHERE id = %s', (item_id,))
             conn.commit()
             cursor.close()
             conn.close()
