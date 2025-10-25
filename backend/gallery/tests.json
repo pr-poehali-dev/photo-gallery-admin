@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Test get gallery items",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "items": []
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test create gallery item",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "image_url": "https://example.com/test.jpg",
+        "title": "Test Item",
+        "description": "Test description"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
